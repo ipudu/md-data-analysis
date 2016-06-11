@@ -4,8 +4,8 @@
 @author: Pu Du
 @email: pdu2@lsu.edu
 
-
 """
+import os
 import numpy as np
 import argparse
 import matplotlib.pyplot as plt
@@ -16,15 +16,16 @@ class XYZReader(object):
     """
     format = "XYZ"
     # these are assumed!
-    units = {'time': 'ps', 'length': 'Angstrom'}
+    units = {'time': 'fs', 'length': 'Angstrom'}
 
     def __init__(self, filename, **kwargs):
         self.filename = filename
         self.xyzfile = open(self.filename, "r")
         self.nAtoms = self.n_atoms()
         self.nFrames = self.n_frames()
-        self.atomInfo = np.empty([self.nFrames, self.nAtoms, 6], dtype=np.float)
-        #self._read_next_timestep()
+        self.atomC = np.empty([self.nFrames, self.nAtoms, 3], dtype=np.float)
+        self.atomV = np.empty([self.nFrames, self.nAtoms, 3], dtype=np.float)
+        self._read_all_frames()
 
     def n_atoms(self):
         """number of atoms in a frame"""
@@ -58,9 +59,10 @@ class XYZReader(object):
         self._offsets = offsets
         return n_frames
 
-    def _read_frame(self, frame):
-        self.xyzfile.seek(self._offsets[frame])
-        return self._read_next_timestep(frame)
+    def _read_all_frames(self):
+        for frame in range(self.nFrames):
+            self.xyzfile.seek(self._offsets[frame])
+            self._read_next_timestep(frame)
 
     def _read_next_timestep(self, frame):
         f = self.xyzfile
@@ -69,11 +71,12 @@ class XYZReader(object):
             f.readline()
             f.readline()
             for i in range(self.nAtoms):
+                lineInfo = f.readline().split()
                 #atom rx ry rz vx vy vz
-                self.atomInfo[frame][i] =  \
-                np.array(map(float, f.readline().split()[1:7]), dtype=np.float)
-            frame += 1
-            return frame
+                self.atomC[frame][i] =  \
+                np.array(map(float, lineInfo[1:4]), dtype=np.float)
+                self.atomV[frame][i] =  \
+                np.array(map(float, lineInfo[4:7]), dtype=np.float)
         except (ValueError, IndexError) as err:
             raise EOFError(err)
 
@@ -88,17 +91,16 @@ class XYZReader(object):
 class vacf(object):
     """ velocity autocorrelation function class
     """
-    def __init__(self,atomInfo):
-        #TODO: need get the velocities
-        self.velocities = atomInfo
-        self.nFrames, self.nAtoms = self.velocites[:1].shape
+    def __init__(self,atomV,filename):
+        self.fprefix  = filename.split('.')[0]
+        self.velocities = atomV
+        self.nFrames, self.nAtoms , random = self.velocities.shape
+        self.max_t = self.nFrames / 2
 
     def v_auto_correlation(self):
         """compute velocity auto correlation function"""
         C = []
-        #TODO: need change the max t
-        max_t = 1000
-        for t in range(max_t):
+        for t in range(self.max_t):
             ct = 0.0
             counter = 0
             for i in range(self.nFrames):
@@ -111,36 +113,45 @@ class vacf(object):
             C.append(ct)
         self.C = np.array(C)
         #normalization
-        self.C /= self.C[0]
+        #self.C /= self.C[0]
         return self.C
+    def out_put(self):
+        with open(self.fprefix+'_vacf.dat','w') as f:
+            f.write("#t dt\n")
+            t = 0
+            for c in self.C:
+                f.write('{} {}\n'.format(t, c))
+                t += 1
+
 
 class plot(object):
     """plotting"""
     #TODO: need redo the plotting class
     def __init__(self, filename):
         self.filename = filename
-        self.x = np.loadtxt(self.filename)[:,0]
-        self.y = np.loadtxt(self.filename)[:,1]
+        self.fprefix = filename.split('.')[0]
+        self.x = np.loadtxt(self.fprefix+'_vacf.dat')[:,0]
+        self.y = np.loadtxt(self.fprefix+'_vacf.dat')[:,1]
 
     def plotting(self):
-        plt.xlabel("Separation r($\AA$)",size=16)
-        plt.ylabel("Free Energy(kcal/mol)",size=16)
-        plt.axis([22, 50, 0., 1.5])s
+        plt.xlabel("t(ps)",size=16)
+        plt.ylabel(r"$<V(0)\cdot V(t)>$",size=16)
+        #plt.axis([22, 50, 0., 1.5])
         plt.xticks(size=15)
         plt.yticks(size=15)
-        plt.plot(x,y,linewidth=2.0)
+        plt.plot(self.x,self.y,linewidth=2.0)
         plt.legend(loc="upper right")
-        pp = PdfPages("pmf.pdf")
+        pp = PdfPages(self.fprefix + "_vacf.pdf")
         plt.savefig(pp, format='pdf')
         pp.close()
 
 def get_parser():
     parser = argparse.ArgumentParser(description='vacf.py: calculating velocity autocorrelation function')
-    parser.add_argument('input', type=str, nargs='?',help='modified xyz file of molecule')
-    parser.add_argument('-c', '--charge',  default=0, type=int,
-                        help='specify total charge of the molecule (default: 0)')
-    parser.add_argument('-b','--basis', default='sto-3g', type=str,
-                        help='specify basis set (default: sto-3g)')
+    parser.add_argument('input', type=str, nargs='?',help='modified xyz format')
+    parser.add_argument('-t','--task', default='vacf', type=str,
+                        help=' type of task: vacf (default: vacf)')
+    parser.add_argument('-p','--plot', default='on', type=str,
+                        help='turn on / off of plotting (default: on)')
     return parser
 
 def command_line_runner():
@@ -149,8 +160,15 @@ def command_line_runner():
     if not args['input']:
         parser.print_help()
         return
-    else:
-        pass
+    if args['task']:
+        if args['task'] is 'vacf':
+            reader = XYZReader(args['input'])
+            tasker = vacf(reader.atomV, args['input'])
+            tasker.v_auto_correlation()
+            tasker.out_put()
+    if args['plot'] is 'on':
+            p = plot(args['input'])
+            p.plotting()
 
 if __name__ == '__main__':
     command_line_runner()
