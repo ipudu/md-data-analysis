@@ -16,7 +16,7 @@ class XYZReader(object):
     """
     format = "XYZ"
     # these are assumed!
-    units = {'time': 'fs', 'length': 'Angstrom'}
+    units = {'time': 'fs', 'length': 'Angstrom', 'speed:':'angstrom/fs'}
 
     def __init__(self, filename, **kwargs):
         self.filename = filename
@@ -25,7 +25,12 @@ class XYZReader(object):
         self.nFrames = self.n_frames()
         self.atomC = np.empty([self.nFrames, self.nAtoms, 3], dtype=np.float)
         self.atomV = np.empty([self.nFrames, self.nAtoms, 3], dtype=np.float)
+        print ("#" * 80)
+        print ("# Initialization")
+        print "#" * 80
+        print ("\n\nReading xyz file ...")
         self._read_all_frames()
+        print ("Done! ..............")
 
     def n_atoms(self):
         """number of atoms in a frame"""
@@ -95,26 +100,31 @@ class vacf(object):
         self.fprefix  = filename.split('.')[0]
         self.velocities = atomV
         self.nFrames, self.nAtoms , random = self.velocities.shape
-        self.max_t = self.nFrames / 2
+        print "#" * 80
+        print "#Task: velocity auto correlation function"
+        print "#" * 80
+        self.max_t = 1000
+
 
     def v_auto_correlation(self):
         """compute velocity auto correlation function"""
         C = []
         for t in range(self.max_t):
+            print ("step:{}".format(t))
             ct = 0.0
-            counter = 0
             for i in range(self.nFrames):
                 if i + t < self.nFrames:
                     for j in range(self.nAtoms):
-                        ct += np.dot(self.velocities[i][j],
-                                     self.velocities[i+t][j])
-                        counter += 1
-            ct = ct * 1.0 / (counter * self.nAtoms)
+                        ct += np.dot(self.velocities[i][j], self.velocities[i+t][j])
+            ct = ct * 1.0 / self.nAtoms
             C.append(ct)
         self.C = np.array(C)
         #normalization
         #self.C /= self.C[0]
         return self.C
+    def diffusion_coefficent(self):
+        d = np.trapz(self.C * 0.1)
+        print ("The diffusion coefficent is: {} cm^2/s".format(d))
     def out_put(self):
         with open(self.fprefix+'_vacf.dat','w') as f:
             f.write("#t dt\n")
@@ -134,13 +144,11 @@ class plot(object):
         self.y = np.loadtxt(self.fprefix+'_vacf.dat')[:,1]
 
     def plotting(self):
-        plt.xlabel("t(ps)",size=16)
+        plt.xlabel("t(fs)",size=16)
         plt.ylabel(r"$<V(0)\cdot V(t)>$",size=16)
-        #plt.axis([22, 50, 0., 1.5])
         plt.xticks(size=15)
         plt.yticks(size=15)
         plt.plot(self.x,self.y,linewidth=2.0)
-        plt.legend(loc="upper right")
         pp = PdfPages(self.fprefix + "_vacf.pdf")
         plt.savefig(pp, format='pdf')
         pp.close()
@@ -165,6 +173,7 @@ def command_line_runner():
             reader = XYZReader(args['input'])
             tasker = vacf(reader.atomV, args['input'])
             tasker.v_auto_correlation()
+            #tasker.diffusion_coefficent()
             tasker.out_put()
     if args['plot'] is 'on':
             p = plot(args['input'])
