@@ -6,6 +6,7 @@
 
 """
 import os
+import sys
 import numpy as np
 import argparse
 import matplotlib.pyplot as plt
@@ -30,7 +31,7 @@ class XYZReader(object):
         print "#" * 80
         print ("\n\nReading xyz file ...")
         self._read_all_frames()
-        print ("Done! ..............")
+        print ("Done! ..............\n\n")
 
     def n_atoms(self):
         """number of atoms in a frame"""
@@ -103,28 +104,35 @@ class vacf(object):
         print "#" * 80
         print "#Task: velocity auto correlation function"
         print "#" * 80
+        print '\n'
         self.max_t = 1000
 
+    def update_progress(self,progress):
+        sys.stdout.write('\r[{0}] {1}%'.format('#'*(progress/2), progress))
+        sys.stdout.flush()
 
     def v_auto_correlation(self):
         """compute velocity auto correlation function"""
         C = []
+        print 'Computing porgress:'
         for t in range(self.max_t):
-            print ("step:{}".format(t))
+            #print ("step:{}".format(t))
             ct = 0.0
             for i in range(self.nFrames):
                 if i + t < self.nFrames:
                     for j in range(self.nAtoms):
                         ct += np.dot(self.velocities[i][j], self.velocities[i+t][j])
-            ct = ct * 1.0 / self.nAtoms
+            ct = ct * 1.0 / (self.nAtoms * self.nFrames)
             C.append(ct)
+            progress = int(float(t)/float(self.max_t) * 100)
+            self.update_progress(progress)
         self.C = np.array(C)
         #normalization
         #self.C /= self.C[0]
         return self.C
     def diffusion_coefficent(self):
-        d = np.trapz(self.C * 0.1)
-        print ("The diffusion coefficent is: {} cm^2/s".format(d))
+        d = 1.0 / 3.0 * np.trapz(self.C * 0.1)
+        print ("\n\nThe diffusion coefficent is: {} cm^2/s".format(d))
     def out_put(self):
         with open(self.fprefix+'_vacf.dat','w') as f:
             f.write("#t dt\n")
@@ -173,7 +181,7 @@ def command_line_runner():
             reader = XYZReader(args['input'])
             tasker = vacf(reader.atomV, args['input'])
             tasker.v_auto_correlation()
-            #tasker.diffusion_coefficent()
+            tasker.diffusion_coefficent()
             tasker.out_put()
     if args['plot'] is 'on':
             p = plot(args['input'])
