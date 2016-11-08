@@ -4,6 +4,19 @@
 @author: Pu Du
 @email: pdu2@lsu.edu
 
+anaconda is required: https://www.continuum.io/downloads
+
+modified xyz file is required:
+
+****************************************************
+*number of atom                                    *
+*                                                  *
+*Atom1 X Y Z VX VY VZ                              *
+*Atom2 X Y Z VX VY VZ                              *
+*...                                               *
+*...                                               *
+****************************************************
+
 """
 import os
 import sys
@@ -135,34 +148,81 @@ class vacf(object):
         print ("\n\nThe diffusion coefficent is: {} cm^2/s".format(d))
     def out_put(self):
         with open(self.fprefix+'_vacf.dat','w') as f:
-            f.write("#t dt\n")
+            f.write("#t <V(0) * V(t)>\n")
             t = 0
             for c in self.C:
                 f.write('{} {}\n'.format(t, c))
                 t += 1
 
+class rmsd(object):
+    """ root mean square displacement
+    """
+    def __init__(self,atomC,filename):
+        self.fprefix  = filename.split('.')[0]
+        self.coordinates = atomC
+        self.nFrames, self.nAtoms , random = self.coordinates.shape
+        print "#" * 80
+        print "#Task: root mean square displacement"
+        print "#" * 80
+        print '\n'
+        self.max_t = 1000
+
+    def update_progress(self,progress):
+        sys.stdout.write('\r[{0}] {1}%'.format('#'*(progress/2), progress))
+        sys.stdout.flush()
+
+    def root_mean_square_displacement(self):
+        """compute root mean square displacment"""
+        C = []
+        print 'Computing porgress:'
+        for t in range(self.max_t):
+            #print ("step:{}".format(t))
+            ct = 0.0
+            for i in range(self.nFrames):
+                if i + t < self.nFrames:
+                    for j in range(self.nAtoms):
+                        mid += np.square(np.subtract(self.coordinates[i][j],
+                                                    self.velocities[i+t][j]))
+                        ct = np.sum(mid)
+            ct = ct * 1.0 / (self.nAtoms * self.nFrames)
+            C.append(ct)
+            progress = int(float(t)/float(self.max_t) * 100)
+            self.update_progress(progress)
+        self.C = np.array(C)
+        return self.C
+    def out_put(self):
+        with open(self.fprefix+'_rmsd.dat','w') as f:
+            f.write("#t <r^2>\n")
+            t = 0
+            for c in self.C:
+                f.write('{} {}\n'.format(t, c))
+                t += 1
 
 class plot(object):
     """plotting"""
     #TODO: need redo the plotting class
-    def __init__(self, filename):
+    def __init__(self, filename, taskname):
         self.filename = filename
+        self.taskname = taskname
         self.fprefix = filename.split('.')[0]
-        self.x = np.loadtxt(self.fprefix+'_vacf.dat')[:,0]
-        self.y = np.loadtxt(self.fprefix+'_vacf.dat')[:,1]
+        self.x = np.loadtxt(self.fprefix+'_'+self.taskname+'.dat')[:,0]
+        self.y = np.loadtxt(self.fprefix+'_'+self.taskname+'.dat')[:,1]
 
     def plotting(self):
         plt.xlabel("t(fs)",size=16)
-        plt.ylabel(r"$<V(0)\cdot V(t)>$",size=16)
+        if self.taskname is 'vacf':
+            plt.ylabel(r"$<V(0)\cdot V(t)>$",size=16)
+        if self.taskname is 'rmsd':
+            plt.ylabel(r"$<r^2>$",size=16)
         plt.xticks(size=15)
         plt.yticks(size=15)
         plt.plot(self.x,self.y,linewidth=2.0)
-        pp = PdfPages(self.fprefix + "_vacf.pdf")
+        pp = PdfPages(self.fprefix +'_'+self.taskname+'.pdf')
         plt.savefig(pp, format='pdf')
         pp.close()
 
 def get_parser():
-    parser = argparse.ArgumentParser(description='vacf.py: calculating velocity autocorrelation function')
+    parser = argparse.ArgumentParser(description='cf.py: calculating self-diffusion coefficent')
     parser.add_argument('input', type=str, nargs='?',help='modified xyz format')
     parser.add_argument('-t','--task', default='vacf', type=str,
                         help=' type of task: vacf (default: vacf)')
@@ -177,15 +237,19 @@ def command_line_runner():
         parser.print_help()
         return
     if args['task']:
+        reader = XYZReader(args['input'])
         if args['task'] is 'vacf':
-            reader = XYZReader(args['input'])
             tasker = vacf(reader.atomV, args['input'])
             tasker.v_auto_correlation()
             tasker.diffusion_coefficent()
             tasker.out_put()
+        if args['task'] is 'rmsd':
+            tasker = rmsd(reader.atomC, args['input'])
+            tasker.root_mean_square_displacement()
+            tasker.out_put()
     if args['plot'] is 'on':
-            p = plot(args['input'])
-            p.plotting()
+        p = plot(args['input'], args['task'])
+        p.plotting()
 
 if __name__ == '__main__':
     command_line_runner()
