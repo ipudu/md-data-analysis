@@ -178,11 +178,12 @@ class rmsd(object):
         for t in range(self.max_t):
             #print ("step:{}".format(t))
             ct = 0.0
+            mid = 0.0
             for i in range(self.nFrames):
                 if i + t < self.nFrames:
                     for j in range(self.nAtoms):
                         mid += np.square(np.subtract(self.coordinates[i][j],
-                                                    self.velocities[i+t][j]))
+                                                    self.coordinates[i+t][j]))
                         ct = np.sum(mid)
             ct = ct * 1.0 / (self.nAtoms * self.nFrames)
             C.append(ct)
@@ -238,12 +239,13 @@ def command_line_runner():
         return
     if args['task']:
         reader = XYZReader(args['input'])
-        if args['task'] is 'vacf':
+        if args['task'] == 'vacf':
             tasker = vacf(reader.atomV, args['input'])
             tasker.v_auto_correlation()
             tasker.diffusion_coefficent()
             tasker.out_put()
-        if args['task'] is 'rmsd':
+        if args['task'] == 'rmsd':
+            print 'test'
             tasker = rmsd(reader.atomC, args['input'])
             tasker.root_mean_square_displacement()
             tasker.out_put()
