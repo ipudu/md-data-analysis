@@ -211,9 +211,9 @@ class plot(object):
 
     def plotting(self):
         plt.xlabel("t(fs)",size=16)
-        if self.taskname is 'vacf':
+        if self.taskname == 'vacf':
             plt.ylabel(r"$<V(0)\cdot V(t)>$",size=16)
-        if self.taskname is 'rmsd':
+        if self.taskname == 'rmsd':
             plt.ylabel(r"$<r^2>$",size=16)
         plt.xticks(size=15)
         plt.yticks(size=15)
