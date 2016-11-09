@@ -11,7 +11,7 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -t TASK, --task TASK  type of task: vacf (default: vacf)
+  -t TASK, --task TASK  type of task: vacf rmsd (default: vacf)
   -p PLOT, --plot PLOT  turn on / off of plotting (default: on)
 ```
 
