@@ -135,7 +135,7 @@ class vacf(object):
                 if i + t < self.nFrames:
                     for j in range(self.nAtoms):
                         ct += np.dot(self.velocities[i][j], self.velocities[i+t][j])
-            ct = ct * 1.0 / (self.nAtoms * self.nFrames)
+            ct = ct * 1.0 / (self.nAtoms * (self.nFrames - t))
             C.append(ct)
             progress = int(float(t)/float(self.max_t) * 100)
             self.update_progress(progress)
@@ -185,7 +185,7 @@ class rmsd(object):
                         mid += np.square(np.subtract(self.coordinates[i][j],
                                                     self.coordinates[i+t][j]))
                         ct = np.sum(mid)
-            ct = ct * 1.0 / (self.nAtoms * self.nFrames)
+            ct = ct * 1.0 / (self.nAtoms * (self.nFrames - t))
             C.append(ct)
             progress = int(float(t)/float(self.max_t) * 100)
             self.update_progress(progress)
