@@ -17,6 +17,9 @@ modified xyz file is required:
 *...                                               *
 ****************************************************
 
+
+default unit: Angstrom, femtosecond
+
 """
 import os
 import sys
