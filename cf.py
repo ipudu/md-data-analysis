@@ -18,7 +18,8 @@ modified xyz file is required:
 ****************************************************
 
 
-default unit: Angstrom, femtosecond
+default unit: 
+units = {'time': 'fs', 'length': 'Angstrom', 'speed:':'angstrom/fs'}
 
 """
 import os
