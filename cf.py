@@ -216,11 +216,12 @@ class plot(object):
     def plotting(self):
         plt.xlabel("t(fs)",size=16)
         if self.taskname == 'vacf':
-            plt.ylabel(r"$<V(0)\cdot V(t)>$",size=16)
+            plt.ylabel(r"$<V(0)\cdot V(t)> (Angstrom/fs)$",size=16)
         if self.taskname == 'rmsd':
-            plt.ylabel(r"$<r^2>$",size=16)
+            plt.ylabel(r"$<r^2> (Angstrom^2/fs)$",size=16)
         plt.xticks(size=15)
         plt.yticks(size=15)
+        plt.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
         plt.plot(self.x,self.y,linewidth=2.0)
         pp = PdfPages(self.fprefix +'_'+self.taskname+'.pdf')
         plt.savefig(pp, format='pdf')
