@@ -26,6 +26,7 @@ import os
 import sys
 import numpy as np
 import argparse
+from numba import jit
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
@@ -216,6 +217,19 @@ class toparam(object):
         print "#" * 80
         print '\n'
 
+    def PBC(self, dx, dy, dz, hL, L):
+        if dx > hL:
+            dx -= L
+        if dx < -hL:
+            dx += L
+        if dy > hL:
+            dy -= L
+        if dz > hL:
+            dz -= L
+        if dz < -hL:
+            dz += L
+        return dx, dy, dz
+
     def get_four_neighbors(self, coordinates, L):
         dist = np.zeros([self.nAtoms, self.nAtoms], dtype=np.float)
         hL = L / 2.
@@ -226,16 +240,7 @@ class toparam(object):
                 dz = coordinates[i][2] - coordinates[j][2]
 
                 #PBC
-                if dx > hL:
-                    dx -= L
-                if dx < -hL:
-                    dx += L
-                if dy > hL:
-                    dy -= L
-                if dz > hL:
-                    dz -= L
-                if dz < -hL:
-                    dz += L
+                dx, dy, dz = self.PBC(dx, dy, dz, hL, L)
 
                 dist_ij = np.sqrt(dx * dx + dy * dy + dz * dz)
                 dist[i][j] = dist_ij
@@ -248,7 +253,15 @@ class toparam(object):
             fourN = [a[0] for a in sorted(enumerate(myList), key=lambda x:x[1])][1:5]
             j = 0
             for index in fourN:
-                myVector[i][j] = coordinates[index] - coordinates[i]
+
+                dx = coordinates[index][0] - coordinates[i][0]
+                dy = coordinates[index][1] - coordinates[i][1]
+                dz = coordinates[index][2] - coordinates[i][2]
+
+                #PBC
+                dx, dy, dz = self.PBC(dx, dy, dz, hL, L)
+
+                myVector[i][j] = [dx, dy, dz]
                 j += 1
         return myVector
 
@@ -256,7 +269,9 @@ class toparam(object):
         """compute tetrahedral order parameter"""
         # cos_phi = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
         for i in range(self.nFrames):
-            myVector  = self.get_four_neighbors(self.coordinates[i])
+            print i
+            #TODO: need get the box size
+            myVector  = self.get_four_neighbors(self.coordinates[i], 14.9096)
             for j in range(self.nAtoms):
                 q = 0.0
                 for k in range(3):
@@ -265,8 +280,9 @@ class toparam(object):
                         magP = (np.linalg.norm(myVector[j][k]) * np.linalg.norm(myVector[j][l]))
                         cos_phi = dotP / magP
                         q += (cos_phi + 1./3.) ** 2
-                q = 1 - 3./8. * q
-                self.Q[int(round(q / 0.1))] += 1
+                q = 1. - 3./8. * q
+                if q > 0.:
+                    self.Q[int(round(q / 0.1))] += 1
         return self.Q
 
     def out_put(self):
@@ -288,16 +304,21 @@ class plot(object):
         self.y = np.loadtxt(self.fprefix+'_'+self.taskname+'.dat')[:,1]
 
     def plotting(self):
-        plt.xlabel("t(fs)",size=16)
         if self.taskname == 'vacf':
+            plt.xlabel("t(fs)",size=16)
             plt.ylabel(r"$<V(0)\cdot V(t)> (Angstrom/fs)$",size=16)
+            plt.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
         if self.taskname == 'rmsd':
+            plt.xlabel("t(fs)",size=16)
             plt.ylabel(r"$<r^2> (Angstrom^2/fs)$",size=16)
+            plt.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
         if self.taskname == 'top':
-            plt.ylabel(r"$Q (arb. unit)$",size=16)
+            plt.xlabel("Q",size=16)
+            plt.ylabel(r"$P(Q)  (arb. unit)$",size=16)
+            plt.yticks([])
+
         plt.xticks(size=15)
         plt.yticks(size=15)
-        plt.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
         plt.plot(self.x,self.y,linewidth=2.0)
         pp = PdfPages(self.fprefix +'_'+self.taskname+'.pdf')
         plt.savefig(pp, format='pdf')
