@@ -18,12 +18,13 @@ modified xyz file is required:
 ****************************************************
 
 
-default unit: 
+default unit:
 units = {'time': 'fs', 'length': 'Angstrom', 'speed:':'angstrom/fs'}
 
 """
 import os
 import sys
+import math
 import numpy as np
 import argparse
 import matplotlib.pyplot as plt
@@ -98,8 +99,9 @@ class XYZReader(object):
                 #atom rx ry rz vx vy vz
                 self.atomC[frame][i] =  \
                 np.array(map(float, lineInfo[1:4]), dtype=np.float)
-                self.atomV[frame][i] =  \
-                np.array(map(float, lineInfo[4:7]), dtype=np.float)
+                if len(lineInfo) == 8:
+                    self.atomV[frame][i] =  \
+                    np.array(map(float, lineInfo[4:7]), dtype=np.float)
         except (ValueError, IndexError) as err:
             raise EOFError(err)
 
@@ -203,6 +205,64 @@ class rmsd(object):
                 f.write('{} {}\n'.format(t, c))
                 t += 1
 
+class toparam(object):
+    """tetrahedral order parameter"""
+    def __init__(self,atomC,filename):
+        self.fprefix  = filename.split('.')[0]
+        self.coordinates = atomC
+        self.nFrames, self.nAtoms , random = self.coordinates.shape
+        self.Q = np.zeros(11)
+        print "#" * 80
+        print "#Task: tetrahedral order parameter"
+        print "#" * 80
+        print '\n'
+
+    def get_four_neighbors(self, coordinates):
+        dist = np.zeros([self.nAtoms, self.nAtoms], dtype=np.float)
+        for i in range(self.nAtoms - 1):
+            for j in range(i + 1, self.nAtoms):
+                dist_ij = math.hypot(coordinates[i][0] - coordinates[j][0],
+                                     coordinates[i][1] - coordinates[j][1],
+                                     coordinates[i][1] - coordinates[j][1])
+                dist[i][j] = dist_ij
+                dist[j][i] = dist_ij
+
+        myVector = np.zeros([self.nAtoms, 4], dtype=np.float)
+
+        for i in range(self.nAtoms):
+            myList = dist[i]
+            fourN = [i[0] for i in sorted(enumerate(myList), key=lambda x:x[1])][1:5]
+            j = 0
+            for index in fourN:
+                myVector[i][j] = coordinates[index] - coordinates[i]
+                j += 1
+        return myVector
+
+    def tetrahedral_order_parameter(self):
+        """compute tetrahedral order parameter"""
+        # cos_phi = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
+        for i in range(self.nFrames):
+            myVector  = get_four_neighbors(self.coordinates[i])
+            for j in range(self.nAtoms):
+                q = 0.0
+                for k in range(3):
+                    for l in range(k+1, 4):
+                        dotP = np.dot(myVector[j][k], myVector[j][l])
+                        magP = (np.linalg.norm(myVector[j][k]) * np.linalg.norm(myVector[j][l]))
+                        cos_phi = dotP / magP
+                        q += (cos_phi + 1./3.) ** 2
+                q = 1 - 3./8. * q
+                self.Q[int(round(q / 0.1))] += 1
+        return self.Q
+
+    def out_put(self):
+        with open(self.fprefix+'_top.dat','w') as f:
+            f.write("#Q count\n")
+            q = 0.0
+            for c in self.Q:
+                f.write('{} {}\n'.format(q, c))
+                q += 0.1
+
 class plot(object):
     """plotting"""
     #TODO: need redo the plotting class
@@ -219,6 +279,8 @@ class plot(object):
             plt.ylabel(r"$<V(0)\cdot V(t)> (Angstrom/fs)$",size=16)
         if self.taskname == 'rmsd':
             plt.ylabel(r"$<r^2> (Angstrom^2/fs)$",size=16)
+        if self.taskname == 'top':
+            plt.ylabel(r"$Q (arb. unit)$",size=16)
         plt.xticks(size=15)
         plt.yticks(size=15)
         plt.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
@@ -231,7 +293,7 @@ def get_parser():
     parser = argparse.ArgumentParser(description='cf.py: calculating self-diffusion coefficent')
     parser.add_argument('input', type=str, nargs='?',help='modified xyz format')
     parser.add_argument('-t','--task', default='vacf', type=str,
-                        help=' type of task: vacf (default: vacf)')
+                        help=' type of task: vacf, rmsd, top (default: vacf)')
     parser.add_argument('-p','--plot', default='on', type=str,
                         help='turn on / off of plotting (default: on)')
     return parser
@@ -250,9 +312,12 @@ def command_line_runner():
             tasker.diffusion_coefficent()
             tasker.out_put()
         if args['task'] == 'rmsd':
-            print 'test'
             tasker = rmsd(reader.atomC, args['input'])
             tasker.root_mean_square_displacement()
+            tasker.out_put()
+        if args['task'] == 'top':
+            tasker = toparam(reader.atomC, args['input'])
+            tasker.tetrahedral_order_parameter()
             tasker.out_put()
     if args['plot'] is 'on':
         p = plot(args['input'], args['task'])
