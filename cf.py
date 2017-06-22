@@ -24,7 +24,6 @@ units = {'time': 'fs', 'length': 'Angstrom', 'speed:':'angstrom/fs'}
 """
 import os
 import sys
-import math
 import numpy as np
 import argparse
 import matplotlib.pyplot as plt
@@ -217,21 +216,36 @@ class toparam(object):
         print "#" * 80
         print '\n'
 
-    def get_four_neighbors(self, coordinates):
+    def get_four_neighbors(self, coordinates, L):
         dist = np.zeros([self.nAtoms, self.nAtoms], dtype=np.float)
+        hL = L / 2.
         for i in range(self.nAtoms - 1):
             for j in range(i + 1, self.nAtoms):
-                dist_ij = math.hypot(coordinates[i][0] - coordinates[j][0],
-                                     coordinates[i][1] - coordinates[j][1],
-                                     coordinates[i][1] - coordinates[j][1])
+                dx = coordinates[i][0] - coordinates[j][0]
+                dy = coordinates[i][1] - coordinates[j][1]
+                dz = coordinates[i][2] - coordinates[j][2]
+
+                #PBC
+                if dx > hL:
+                    dx -= L
+                if dx < -hL:
+                    dx += L
+                if dy > hL:
+                    dy -= L
+                if dz > hL:
+                    dz -= L
+                if dz < -hL:
+                    dz += L
+
+                dist_ij = np.sqrt(dx * dx + dy * dy + dz * dz)
                 dist[i][j] = dist_ij
                 dist[j][i] = dist_ij
 
-        myVector = np.zeros([self.nAtoms, 4], dtype=np.float)
+        myVector = np.zeros([self.nAtoms, 4, 3], dtype=np.float)
 
         for i in range(self.nAtoms):
             myList = dist[i]
-            fourN = [i[0] for i in sorted(enumerate(myList), key=lambda x:x[1])][1:5]
+            fourN = [a[0] for a in sorted(enumerate(myList), key=lambda x:x[1])][1:5]
             j = 0
             for index in fourN:
                 myVector[i][j] = coordinates[index] - coordinates[i]
@@ -242,7 +256,7 @@ class toparam(object):
         """compute tetrahedral order parameter"""
         # cos_phi = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
         for i in range(self.nFrames):
-            myVector  = get_four_neighbors(self.coordinates[i])
+            myVector  = self.get_four_neighbors(self.coordinates[i])
             for j in range(self.nAtoms):
                 q = 0.0
                 for k in range(3):
