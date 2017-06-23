@@ -41,7 +41,9 @@ class XYZReader(object):
         self.filename = filename
         self.xyzfile = open(self.filename, "r")
         self.nAtoms = self.n_atoms()
+        self.box = self.box_size()
         self.nFrames = self.n_frames()
+        self.atomN = np.empty([self.nFrames, self.nAtoms, 1], dtype='|S2')
         self.atomC = np.empty([self.nFrames, self.nAtoms, 3], dtype=np.float)
         self.atomV = np.empty([self.nFrames, self.nAtoms, 3], dtype=np.float)
         print ("#" * 80)
@@ -56,6 +58,18 @@ class XYZReader(object):
         with open(self.filename, 'r') as f:
             n = f.readline()
         return int(n)
+
+    def box_size(self):
+        """simulation box size"""
+        box = np.zeros(3)
+        with open(self.filename, 'r') as f:
+            f.readline()
+            lineInfo = f.readline().split()
+            try:
+                box = np.array(map(float, lineInfo), dtype=np.float)
+            except:
+                print("Couldn't read box size, please check the xyz file!")
+        return box
 
     def n_frames(self):
         try:
@@ -97,6 +111,7 @@ class XYZReader(object):
             for i in range(self.nAtoms):
                 lineInfo = f.readline().split()
                 #atom rx ry rz vx vy vz
+                self.atomN[frame][i] = lineInfo[0]
                 self.atomC[frame][i] =  \
                 np.array(map(float, lineInfo[1:4]), dtype=np.float)
                 if len(lineInfo) == 8:
@@ -207,9 +222,11 @@ class rmsd(object):
 
 class toparam(object):
     """tetrahedral order parameter"""
-    def __init__(self,atomC,filename):
+    def __init__(self,atomC,atomN, box, filename):
         self.fprefix  = filename.split('.')[0]
+        self.atomN = atomN
         self.coordinates = atomC
+        self.box = box
         self.nFrames, self.nAtoms , random = self.coordinates.shape
         self.Q = np.zeros(11)
         print "#" * 80
@@ -218,21 +235,23 @@ class toparam(object):
         print '\n'
 
     def PBC(self, dx, dy, dz, hL, L):
-        if dx > hL:
-            dx -= L
-        if dx < -hL:
-            dx += L
-        if dy > hL:
-            dy -= L
-        if dz > hL:
-            dz -= L
-        if dz < -hL:
-            dz += L
+        if dx > hL[0]:
+            dx -= L[0]
+        if dx < -hL[0]:
+            dx += L[0]
+        if dy > hL[1]:
+            dy -= L[1]
+        if dy < -hL[1]:
+            dy += L[1]
+        if dz > hL[2]:
+            dz -= L[2]
+        if dz < -hL[2]:
+            dz += L[2]
         return dx, dy, dz
 
     def get_four_neighbors(self, coordinates, L):
         dist = np.zeros([self.nAtoms, self.nAtoms], dtype=np.float)
-        hL = L / 2.
+        hL = [x / 2. for x in L]
         for i in range(self.nAtoms - 1):
             for j in range(i + 1, self.nAtoms):
                 dx = coordinates[i][0] - coordinates[j][0]
@@ -265,24 +284,24 @@ class toparam(object):
                 j += 1
         return myVector
 
-    def tetrahedral_order_parameter(self):
+    def tetrahedral_order_parameter(self, center="O1"):
         """compute tetrahedral order parameter"""
         # cos_phi = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
-        for i in range(self.nFrames):
-            print i
-            #TODO: need get the box size
-            myVector  = self.get_four_neighbors(self.coordinates[i], 14.9096)
+        for i in xrange(self.nFrames):
+            print(i)
+            myVector  = self.get_four_neighbors(self.coordinates[i], self.box)
             for j in range(self.nAtoms):
-                q = 0.0
-                for k in range(3):
-                    for l in range(k+1, 4):
-                        dotP = np.dot(myVector[j][k], myVector[j][l])
-                        magP = (np.linalg.norm(myVector[j][k]) * np.linalg.norm(myVector[j][l]))
-                        cos_phi = dotP / magP
-                        q += (cos_phi + 1./3.) ** 2
-                q = 1. - 3./8. * q
-                if q > 0.:
-                    self.Q[int(round(q / 0.1))] += 1
+                if self.atomN[i][j] == center:
+                    q = 0.0
+                    for k in range(3):
+                        for l in range(k+1, 4):
+                            dotP = np.dot(myVector[j][k], myVector[j][l])
+                            magP = (np.linalg.norm(myVector[j][k]) * np.linalg.norm(myVector[j][l]))
+                            cos_phi = dotP / magP
+                            q += (cos_phi + 1./3.) ** 2
+                    q = 1. - 3./8. * q
+                    if q > 0.:
+                        self.Q[int(round(q / 0.1))] += 1
         return self.Q
 
     def out_put(self):
@@ -351,7 +370,8 @@ def command_line_runner():
             tasker.root_mean_square_displacement()
             tasker.out_put()
         if args['task'] == 'top':
-            tasker = toparam(reader.atomC, args['input'])
+            tasker = toparam(reader.atomC, reader.atomN,
+                             reader.box, args['input'])
             tasker.tetrahedral_order_parameter()
             tasker.out_put()
     if args['plot'] is 'on':
