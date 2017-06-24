@@ -222,13 +222,14 @@ class rmsd(object):
 
 class toparam(object):
     """tetrahedral order parameter"""
-    def __init__(self,atomC,atomN, box, filename):
+    def __init__(self,atomC,atomN, box, center, filename):
         self.fprefix  = filename.split('.')[0]
         self.atomN = atomN
         self.coordinates = atomC
         self.box = box
         self.nFrames, self.nAtoms , random = self.coordinates.shape
-        self.Q = np.zeros(11)
+        self.Q = np.zeros(101)
+        self.center = center
         print "#" * 80
         print "#Task: tetrahedral order parameter"
         print "#" * 80
@@ -284,14 +285,14 @@ class toparam(object):
                 j += 1
         return myVector
 
-    def tetrahedral_order_parameter(self, center="O1"):
+    def tetrahedral_order_parameter(self, freq):
         """compute tetrahedral order parameter"""
         # cos_phi = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
-        for i in xrange(self.nFrames):
+        for i in xrange(0, self.nFrames, freq):
             print(i)
             myVector  = self.get_four_neighbors(self.coordinates[i], self.box)
             for j in range(self.nAtoms):
-                if self.atomN[i][j] == center:
+                if self.atomN[i][j] == self.center:
                     q = 0.0
                     for k in range(3):
                         for l in range(k+1, 4):
@@ -301,7 +302,7 @@ class toparam(object):
                             q += (cos_phi + 1./3.) ** 2
                     q = 1. - 3./8. * q
                     if q > 0.:
-                        self.Q[int(round(q / 0.1))] += 1
+                        self.Q[int(round(q / 0.01))] += 1
         return self.Q
 
     def out_put(self):
@@ -310,7 +311,7 @@ class toparam(object):
             q = 0.0
             for c in self.Q:
                 f.write('{} {}\n'.format(q, c))
-                q += 0.1
+                q += 0.01
 
 class plot(object):
     """plotting"""
@@ -348,6 +349,10 @@ def get_parser():
     parser.add_argument('input', type=str, nargs='?',help='modified xyz format')
     parser.add_argument('-t','--task', default='vacf', type=str,
                         help=' type of task: vacf, rmsd, top (default: vacf)')
+    parser.add_argument('-c','--center', default='O', type=str,
+                        help=' type of center atom for Q (default: O)')
+    parser.add_argument('-f','--frequency', default='1', type=int,
+                        help=' frame frequency for Q (default: 1)')
     parser.add_argument('-p','--plot', default='on', type=str,
                         help='turn on / off of plotting (default: on)')
     return parser
@@ -371,8 +376,8 @@ def command_line_runner():
             tasker.out_put()
         if args['task'] == 'top':
             tasker = toparam(reader.atomC, reader.atomN,
-                             reader.box, args['input'])
-            tasker.tetrahedral_order_parameter()
+                             reader.box, args['center'], args['input'])
+            tasker.tetrahedral_order_parameter(args['frequency'])
             tasker.out_put()
     if args['plot'] is 'on':
         p = plot(args['input'], args['task'])
