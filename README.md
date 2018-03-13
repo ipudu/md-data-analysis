@@ -1,5 +1,6 @@
-# Correlation functions  
-python correlation_functions code
+# Molecular Dynamics Simulation Data Analysis
+
+## cf.py: correlation functions
 
 ```bash
 usage: cf.py [-h] [-t TASK] [-p PLOT] [input]
@@ -14,6 +15,4 @@ optional arguments:
   -t TASK, --task TASK  type of task: vacf rmsd (default: vacf)
   -p PLOT, --plot PLOT  turn on / off of plotting (default: on)
 ```
-
-##Author
-Pu Du
+## mol_volume.py: A tool to calculate the molecular volume
