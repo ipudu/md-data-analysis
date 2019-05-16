@@ -10,7 +10,7 @@ modified xyz file is required:
 
 ****************************************************
 *number of atom                                    *
-*                                                  *
+*Boxx Boxy Boxz                                    *
 *Atom1 X Y Z VX VY VZ                              *
 *Atom2 X Y Z VX VY VZ                              *
 *...                                               *
@@ -114,9 +114,8 @@ class XYZReader(object):
                 self.atomN[frame][i] = lineInfo[0]
                 self.atomC[frame][i] =  \
                 np.array(map(float, lineInfo[1:4]), dtype=np.float)
-                if len(lineInfo) == 8:
-                    self.atomV[frame][i] =  \
-                    np.array(map(float, lineInfo[4:7]), dtype=np.float)
+                self.atomV[frame][i] =  \
+                np.array(map(float, lineInfo[4:7]), dtype=np.float)
         except (ValueError, IndexError) as err:
             raise EOFError(err)
 
