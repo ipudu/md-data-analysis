@@ -48,7 +48,7 @@ class XYZReader(object):
         self.atomV = np.empty([self.nFrames, self.nAtoms, 3], dtype=np.float)
         print ("#" * 80)
         print ("# Initialization")
-        print "#" * 80
+        print ("#" * 80)
         print ("\n\nReading xyz file ...")
         self._read_all_frames()
         print ("Done! ..............\n\n")
@@ -135,10 +135,10 @@ class vacf(object):
         self.fprefix  = filename.split('.')[0]
         self.velocities = atomV
         self.nFrames, self.nAtoms , random = self.velocities.shape
-        print "#" * 80
-        print "#Task: velocity auto correlation function"
-        print "#" * 80
-        print '\n'
+        print ("#" * 80)
+        print ("#Task: velocity auto correlation function")
+        print ("#" * 80)
+        print ('\n')
         self.max_t = 1000
 
     def update_progress(self,progress):
@@ -148,7 +148,7 @@ class vacf(object):
     def v_auto_correlation(self):
         """compute velocity auto correlation function"""
         C = []
-        print 'Computing porgress:'
+        print ('Computing porgress:')
         for t in range(self.max_t):
             #print ("step:{}".format(t))
             ct = 0.0
@@ -182,10 +182,10 @@ class rmsd(object):
         self.fprefix  = filename.split('.')[0]
         self.coordinates = atomC
         self.nFrames, self.nAtoms , random = self.coordinates.shape
-        print "#" * 80
-        print "#Task: root mean square displacement"
-        print "#" * 80
-        print '\n'
+        print ("#" * 80)
+        print ("#Task: root mean square displacement")
+        print ("#" * 80)
+        print ('\n')
         self.max_t = 1000
 
     def update_progress(self,progress):
@@ -195,7 +195,7 @@ class rmsd(object):
     def root_mean_square_displacement(self):
         """compute root mean square displacment"""
         C = []
-        print 'Computing porgress:'
+        print ('Computing porgress:')
         for t in range(self.max_t):
             #print ("step:{}".format(t))
             ct = 0.0
@@ -230,10 +230,10 @@ class toparam(object):
         self.nFrames, self.nAtoms , random = self.coordinates.shape
         self.Q = np.zeros(101)
         self.center = center
-        print "#" * 80
-        print "#Task: tetrahedral order parameter"
-        print "#" * 80
-        print '\n'
+        print ("#" * 80)
+        print ("#Task: tetrahedral order parameter")
+        print ("#" * 80)
+        print ('\n')
 
     def PBC(self, dx, dy, dz, hL, L):
         if dx > hL[0]:
